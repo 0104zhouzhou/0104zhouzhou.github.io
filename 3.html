@@ -89,13 +89,19 @@
     <button id="music-toggle" class="btn-pixel-sun">
         <i class="fa fa-sun-o text-xl"></i>
     </button>
-    <audio id="bg-music" loop autoplay>
+    <audio id="bg-music" loop>
         <source src="music/夏之光 - 你的颜色 [mqms2].mp3" type="audio/mpeg">
+        您的浏览器不支持音频播放
     </audio>
+
+    <!-- 音频提示 -->
+    <div id="audio-notification" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-dark text-white px-4 py-2 rounded-md shadow-lg z-50">
+        <p>点击任意位置开始播放背景音乐</p>
+    </div>
 
     <div id="pet-container" class="relative mb-8">
         <div id="cat" class="w-40 h-40 relative mt-12">
-            <img id="cat-image" src="https://picsum.photos/seed/orangecat/200/200" alt="橘猫图片" class="w-full h-full object-contain transition-transform duration-300">
+            <img id="cat-image" src="image/柳为雪.jpg" alt="橘猫图片" class="w-full h-full object-contain transition-transform duration-300">
         </div>
     </div>
     
@@ -164,6 +170,7 @@
         const timeStatus = document.getElementById('timeStatus');
         const musicToggle = document.getElementById('music-toggle');
         const bgMusic = document.getElementById('bg-music');
+        const audioNotification = document.getElementById('audio-notification');
         
         // 初始状态
         let affection = 50;
@@ -172,7 +179,7 @@
         let lastSatietyUpdate = new Date();
         let currentPeriod = '';
         let lastAffectionLevel = 'normal';
-        let isMusicPlaying = true;
+        let isMusicPlaying = false;
         
         // 定义时段常量
         const PERIODS = {
@@ -201,6 +208,15 @@
         const SATIETY_LEVELS = {
             NORMAL: 'normal',
             LOW: 'low'
+        };
+        
+        // 图片路径配置
+        const CAT_IMAGES = {
+            NORMAL: 'image/柳为雪.jpg',
+            HUNGRY: 'image/李赫.jpg',
+            ANGRY: 'image/李赫.jpg',
+            SAD: 'image/李赫.jpg',
+            SLEEP: 'image/困.jpg'
         };
         
         // 初始化好感度和饱食度显示
@@ -321,20 +337,20 @@
                 newLevel = AFFECTION_LEVELS.VERY_LOW;
                 if (lastAffectionLevel !== newLevel) {
                     message = "人你不要喵喵了吗";
-                    catImage.src = "https://picsum.photos/seed/orangecatsad/200/200";
+                    catImage.src = CAT_IMAGES.SAD;
                     catImage.classList.add('cat-frizzy');
                 }
             } else if (affection <= 50) {
                 newLevel = AFFECTION_LEVELS.LOW;
                 if (lastAffectionLevel !== newLevel) {
                     message = "你再不来本猫要生气了！";
-                    catImage.src = "https://picsum.photos/seed/orangecatangry/200/200";
+                    catImage.src = CAT_IMAGES.ANGRY;
                     catImage.classList.add('cat-frizzy');
                 }
             } else {
                 if (lastAffectionLevel !== newLevel) {
                     if (currentPeriod !== PERIODS.SLEEP && satiety > 30) {
-                        catImage.src = "https://picsum.photos/seed/orangecat/200/200";
+                        catImage.src = CAT_IMAGES.NORMAL;
                     }
                     catImage.classList.remove('cat-frizzy');
                 }
@@ -360,20 +376,19 @@
                 newLevel = SATIETY_LEVELS.LOW;
                 if (currentPeriod !== PERIODS.SLEEP) {
                     // 修改为饥饿状态的图片
-                    catImage.src = "https://picsum.photos/seed/orangecathungry/200/200";
+                    catImage.src = CAT_IMAGES.HUNGRY;
                     // 同时添加炸毛和饥饿动画
                     catImage.classList.add('cat-frizzy', 'cat-hungry');
                 }
                 
                 // 每30秒提醒一次
                 if (Math.floor((new Date() - lastInteractionTime) / 30000) % 3 === 0) {
-                    // 使用新的提示语
                     message = "人我好饿，你快来啊！";
                 }
             } else {
                 if (affection > 50) {
                     if (currentPeriod !== PERIODS.SLEEP) {
-                        catImage.src = "https://picsum.photos/seed/orangecat/200/200";
+                        catImage.src = CAT_IMAGES.NORMAL;
                     }
                     // 移除炸毛和饥饿动画
                     catImage.classList.remove('cat-frizzy', 'cat-hungry');
@@ -427,7 +442,7 @@
             
             if (isMusicPlaying) {
                 bgMusic.play().catch(e => {
-                    console.log('自动播放失败:', e);
+                    console.log('播放失败:', e);
                     isMusicPlaying = false;
                     musicToggle.className = 'btn-pixel-moon';
                     musicToggle.innerHTML = '<i class="fa fa-moon-o text-xl"></i>';
@@ -441,8 +456,32 @@
             }
         }
         
+        // 首次点击触发音乐
+        document.addEventListener('click', function enableAudio() {
+            if (!isMusicPlaying) {
+                bgMusic.play().then(() => {
+                    isMusicPlaying = true;
+                    musicToggle.className = 'btn-pixel-sun';
+                    musicToggle.innerHTML = '<i class="fa fa-sun-o text-xl"></i>';
+                    audioNotification.classList.add('hidden');
+                }).catch(e => {
+                    console.log('用户交互后播放仍失败:', e);
+                });
+            }
+            document.removeEventListener('click', enableAudio);
+        }, { once: true });
+        
         // 事件监听器
         petBtn.addEventListener('click', () => {
+            // 首次交互时尝试播放音乐
+            if (!isMusicPlaying) {
+                bgMusic.play().catch(e => console.log('播放失败:', e));
+                isMusicPlaying = true;
+                musicToggle.className = 'btn-pixel-sun';
+                musicToggle.innerHTML = '<i class="fa fa-sun-o text-xl"></i>';
+                audioNotification.classList.add('hidden');
+            }
+            
             if (isSleepyTime()) {
                 updateAffection(0);
                 return;
@@ -456,6 +495,15 @@
         });
         
         feedBtn.addEventListener('click', () => {
+            // 首次交互时尝试播放音乐
+            if (!isMusicPlaying) {
+                bgMusic.play().catch(e => console.log('播放失败:', e));
+                isMusicPlaying = true;
+                musicToggle.className = 'btn-pixel-sun';
+                musicToggle.innerHTML = '<i class="fa fa-sun-o text-xl"></i>';
+                audioNotification.classList.add('hidden');
+            }
+            
             if (isSleepyTime()) {
                 createSpeechBubble('zzZ... 睡觉时间不吃东西...');
                 return;
@@ -483,6 +531,15 @@
         });
         
         playBtn.addEventListener('click', () => {
+            // 首次交互时尝试播放音乐
+            if (!isMusicPlaying) {
+                bgMusic.play().catch(e => console.log('播放失败:', e));
+                isMusicPlaying = true;
+                musicToggle.className = 'btn-pixel-sun';
+                musicToggle.innerHTML = '<i class="fa fa-sun-o text-xl"></i>';
+                audioNotification.classList.add('hidden');
+            }
+            
             if (isSleepyTime()) {
                 createSpeechBubble('zzZ... 人家还在睡觉呢...');
                 return;
@@ -512,6 +569,15 @@
         // 处理食物选项点击
         foodButtons.forEach(button => {
             button.addEventListener('click', () => {
+                // 首次交互时尝试播放音乐
+                if (!isMusicPlaying) {
+                    bgMusic.play().catch(e => console.log('播放失败:', e));
+                    isMusicPlaying = true;
+                    musicToggle.className = 'btn-pixel-sun';
+                    musicToggle.innerHTML = '<i class="fa fa-sun-o text-xl"></i>';
+                    audioNotification.classList.add('hidden');
+                }
+                
                 if (isSleepyTime()) {
                     createSpeechBubble('zzZ... 睡觉时间不吃东西...');
                     return;
@@ -555,6 +621,15 @@
         // 处理陪玩选项点击
         playButtons.forEach(button => {
             button.addEventListener('click', () => {
+                // 首次交互时尝试播放音乐
+                if (!isMusicPlaying) {
+                    bgMusic.play().catch(e => console.log('播放失败:', e));
+                    isMusicPlaying = true;
+                    musicToggle.className = 'btn-pixel-sun';
+                    musicToggle.innerHTML = '<i class="fa fa-sun-o text-xl"></i>';
+                    audioNotification.classList.add('hidden');
+                }
+                
                 if (isSleepyTime()) {
                     createSpeechBubble('zzZ... 人家还在睡觉呢...');
                     return;
@@ -626,6 +701,15 @@
         });
         
         praiseBtn.addEventListener('click', () => {
+            // 首次交互时尝试播放音乐
+            if (!isMusicPlaying) {
+                bgMusic.play().catch(e => console.log('播放失败:', e));
+                isMusicPlaying = true;
+                musicToggle.className = 'btn-pixel-sun';
+                musicToggle.innerHTML = '<i class="fa fa-sun-o text-xl"></i>';
+                audioNotification.classList.add('hidden');
+            }
+            
             if (isSleepyTime()) {
                 updateAffection(0);
                 return;
@@ -726,15 +810,15 @@
                     if (currentPeriod === PERIODS.MORNING) {
                         createSpeechBubble('喵~ 早上好！');
                         if (satiety > 30) {
-                            catImage.src = "https://picsum.photos/seed/orangecat/200/200";
+                            catImage.src = CAT_IMAGES.NORMAL;
                         } else {
-                            catImage.src = "https://picsum.photos/seed/orangecathungry/200/200";
+                            catImage.src = CAT_IMAGES.HUNGRY;
                         }
                         catImage.classList.remove('cat-frizzy');
                     }
                     
                     if (currentPeriod === PERIODS.SLEEP) {
-                        catImage.src = "https://picsum.photos/seed/orangecatsleep/200/200";
+                        catImage.src = CAT_IMAGES.SLEEP;
                         createSpeechBubble('zzZ... 我要睡觉啦');
                         catImage.classList.remove('cat-frizzy', 'cat-hungry', 'cat-play');
                     }
@@ -759,4 +843,4 @@
         startPeriodMonitor();
     </script>
 </body>
-</html>    
+</html>
